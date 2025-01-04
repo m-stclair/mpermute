@@ -248,7 +248,7 @@ mpermute(PyObject *self, PyObject *const *args, Py_ssize_t n_args) {
     MsetIter *msi = init_mse_iter(objs, n);
     if (msi == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to set up iteration.");
-        free(perms);
+        Py_DECREF(perms);
         free(objs);
         return NULL;
     }
@@ -287,7 +287,7 @@ mpermute(PyObject *self, PyObject *const *args, Py_ssize_t n_args) {
 static PyMethodDef
 MpermuteMethods[] = {
     {
-        "mpermute",
+        "_mpermute",
         (PyCFunction) mpermute,
         METH_FASTCALL,
         "Multi-permutation function."
@@ -310,15 +310,8 @@ PyMODINIT_FUNC PyInit__mpermute(void) {
     return PyModule_Create(&mpermute_mod);
 }
 
+// this function is only present for debugging purposes
 int
 main() {
-//    PyObject *one = PyLong_FromLong(1);
-//    PyObject *two = PyLong_FromLong(2);
-//    PyObject **things = malloc(sizeof(PyObject*) * 4);
-//    things[0] = one;
-//    things[1] = two;
-//    things[2] = one;
-//    things[3] = two;
-//    unsigned long res = n_uniq_pyobj_perms(things, 4);
     return 0;
 }

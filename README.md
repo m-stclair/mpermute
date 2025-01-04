@@ -20,9 +20,25 @@ Use at your own peril.
 
 Install from source with `pip install .`.
 
-## usage
+## example of use
 
-A high-level API is forthcoming. For now, figure it out.
+```
+>>> from mpermute import mpermute
+>>> mpermute("akjj")
+
+(('k', 'j', 'j', 'a'),
+('a', 'k', 'j', 'j'),
+('k', 'a', 'j', 'j'),
+('j', 'k', 'a', 'j'),
+('a', 'j', 'k', 'j'),
+('j', 'a', 'k', 'j'),
+('k', 'j', 'a', 'j'),
+('j', 'k', 'j', 'a'),
+('j', 'j', 'k', 'a'),
+('a', 'j', 'j', 'k'),
+('j', 'a', 'j', 'k'),
+('j', 'j', 'a', 'k'))
+```
 
 ## licensing
 
