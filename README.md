@@ -20,10 +20,11 @@ Use at your own peril.
 
 Install from source with `pip install .`.
 
-## example of use
+## examples of use
 
 ```
->>> from mpermute import mpermute
+>>> from mpermute import mperms, mpermute
+
 >>> mpermute("akjj")
 
 (('k', 'j', 'j', 'a'),
@@ -38,6 +39,34 @@ Install from source with `pip install .`.
 ('a', 'j', 'j', 'k'),
 ('j', 'a', 'j', 'k'),
 ('j', 'j', 'a', 'k'))
+
+>>> next(mperms("akjj")
+
+('k', 'j', 'j', 'a')
+
+>>> lists = [1], [2, 3], [9, 1], [1, 4]
+>>> mpermute(lists + (lists[0],), )
+
+(([9, 1], [2, 3], [1, 4], [1], [1]),
+ ([1], [9, 1], [2, 3], [1, 4], [1]),
+ ([9, 1], [1], [2, 3], [1, 4], [1]),
+ ([2, 3], [9, 1], [1], [1, 4], [1]),
+...
+
+>>> mpermute(lists + (lists[0],), lambda x, y: len(x) > len(y))
+
+(([1], [1], [2, 3], [2, 3], [2, 3]),
+ ([2, 3], [1], [1], [2, 3], [2, 3]),
+ ([1], [2, 3], [1], [2, 3], [2, 3]),
+ ([2, 3], [1], [2, 3], [1], [2, 3]),
+ ([2, 3], [2, 3], [1], [1], [2, 3]),
+ ([1], [2, 3], [2, 3], [1], [2, 3]),
+ ([2, 3], [1], [2, 3], [2, 3], [1]),
+ ([2, 3], [2, 3], [1], [2, 3], [1]),
+ ([2, 3], [2, 3], [2, 3], [1], [1]),
+ ([1], [2, 3], [2, 3], [2, 3], [1]))
+
+
 ```
 
 ## licensing
