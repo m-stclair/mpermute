@@ -1,8 +1,8 @@
 from setuptools import Extension, setup
 
 mpermute = Extension(
-    "mpermute._mpermute",
-    sources=["mpermute/_mpermute.c"],
+    "mpermute.mpermute_core",
+    sources=["mpermute/mpermute_core.c", "mpermute/unique.c"],
     extra_compile_args=["-g"]
 )
 
