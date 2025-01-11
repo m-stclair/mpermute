@@ -1,4 +1,5 @@
 #include "api_helpers.h"
+//#include "group.h"
 #include "unique.h"
 
 typedef struct
@@ -115,6 +116,8 @@ MpermSetupState {
     PyObject *key;
     UniqueResult *uresult;
     long n;
+    PyObject *key_lt;
+    PyObject *key_eq;
 } MpermSetupState;
 
 static MpermSetupState *
@@ -127,6 +130,8 @@ new_mperm_setup_state() {
     msst->uresult = NULL;
     msst->n = 0;
     msst->msi = NULL;
+    msst->key_eq = NULL;
+    msst->key_lt = NULL;
     return msst;
 }
 
@@ -153,7 +158,6 @@ mperm_setup(PyObject *const *args, Py_ssize_t n_args) {
         msst->trivial_output = output_trivial;
         return msst;
     }
-    if (PyErr_Occurred()) return msst;
     if (!Py_IsNone(key))
         if (PyCallable_Check(key) == 0)
             MSST_ERROUT(msst, TYPEERROR, "Invalid relational operator.");
@@ -323,6 +327,24 @@ MpermuteCoreMethods[] = {
         METH_FASTCALL,
         "Unique-counting function."
     },
+    {
+        "unique_2",
+        (PyCFunction) unique_2,
+        METH_FASTCALL,
+        "Unique-counting function."
+    },
+//    {
+//        "groupby",
+//        (PyCFunction) groupby,
+//        METH_FASTCALL,
+//        "Group-by-key function."
+//    },
+//    {
+//        "dictbuild",
+//        (PyCFunction) dictbuild,
+//        METH_FASTCALL,
+//        "Pointlessly build dict."
+//    },
     {NULL, NULL, 0, NULL}
 };
 

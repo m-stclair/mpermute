@@ -1,16 +1,32 @@
 from typing import Callable, Hashable, Protocol, TypeVar, TypeAlias
 
-R = TypeVar('R')
+T = TypeVar('T')
 
 
-class HasOrdering(Protocol):
-    def __lt__(self: R, other: R) -> bool:
+class SupportsOrder(Protocol):
+    def __lt__(self: T, other: T) -> bool:
         pass
 
-    def __eq__(self: R, other: R) -> bool:
+    def __eq__(self: T, other: T) -> bool:
         pass
 
 
-E = TypeVar('E', bound=Hashable)
-O = TypeVar('O', bound=HasOrdering)
-Keyfunc: TypeAlias = Callable[[E], O]
+class SupportsOrderAndHash(Protocol):
+    def __lt__(self: T, other: T) -> bool:
+        pass
+
+    def __eq__(self: T, other: T) -> bool:
+        pass
+
+    def __hash__(self: T) -> int:
+        pass
+
+
+HashableT = TypeVar('HashableT', bound=Hashable)
+OrderedT = TypeVar('OrderedT', bound=SupportsOrder)
+HashableOrderedT = TypeVar(
+    'HashableOrderedT', bound=SupportsOrderAndHash
+)
+
+GroupKeyfunc: TypeAlias = Callable[[T], HashableOrderedT]
+MPKeyfunc: TypeAlias = Callable[[HashableT], OrderedT]

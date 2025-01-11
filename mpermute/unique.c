@@ -144,6 +144,58 @@ unique_local(PyObject *elements, const long n, UniqueResult *const result,
     result->nunique = PyObject_Length(udict);
 }
 
+static inline PyObject *
+identity(PyObject *unused, PyObject *el) { return el; }
+
+static void
+unique_local_2(PyObject *elements, const long n, UniqueResult *const result,
+             PyObject *const key) {
+    result->udict_sorted = false;
+    PyObject *const udict = PyDict_New();
+    PyObject *const sorted = GETATTR(IMPORT("builtins"), "sorted");
+    PyObject *args = PyTuple_New(1);
+    PyTuple_SetItem(args, 0, elements);
+    PyObject *kwargs = PyDict_New();
+    PyDict_SetItemString(kwargs, "key", key);
+    PyObject *const list = PyObject_Call(sorted, args, kwargs);
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    if (!list) UL_SEQERR(result, elements, udict, false);
+    PyObject *const fastel = PySequence_Fast(list, "");
+    if (!fastel) {
+        Py_DECREF(list);
+        UL_SEQERR(result, elements, udict, false);
+    }
+    long count = 0;
+    PyObject *last = PySequence_Fast_GET_ITEM(fastel, 0);
+    PyObject *(*cfunc)(PyObject *func, PyObject *arg);
+    if (Py_IsNone(key)) cfunc = identity;
+    else cfunc = pycall_v1;
+    PyObject *comp = cfunc(key, last);
+    PyObject *comp_eq = GETATTR(PyObject_Type(comp), "__eq__");
+    if (PyErr_Occurred()) UL_SEQERR(result, elements, udict, true);
+    for (long ix = 1; ix < PySequence_Fast_GET_SIZE(fastel); ix++) {
+        PyObject *const next = FGETITEM(fastel, ix);
+        PyObject *const nextcomp = cfunc(key, next);
+        PyObject *nochange = pycall_v2(comp_eq, comp, next);
+        if (PyErr_Occurred()) UL_SEQERR(result, elements, udict, true);
+        if (nochange == Py_False) {
+            PyDict_SetItem(udict, last, PyLong_FromLong(++count));
+            Py_INCREF(last);
+            count = 0;
+        } else count++;
+        last = next, comp = nextcomp;
+    }
+    PyDict_SetItem(udict, last, PyLong_FromLong(++count));
+    Py_DECREF(list);
+    Py_DECREF(fastel);
+    result->udict_sorted = true;
+    // TODO: length-0 case
+    result->udict = udict;
+    result->nunique = PyObject_Length(udict);
+}
+
+
 UniqueResult *
 n_uniq_pyobj_perms(PyObject *elements, const long n, PyObject *const lt) {
     UniqueResult *result = malloc(sizeof(UniqueResult));
@@ -169,20 +221,46 @@ n_uniq_pyobj_perms(PyObject *elements, const long n, PyObject *const lt) {
 
 
 PyObject *
-unique(PyObject *self, PyObject *const *args, Py_ssize_t n_args) {
-    if (n_args != 2)
-        PYRAISE(TYPEERROR, "Function accepts exactly 2 arguments.");
-    PyObject *const mset = args[0], *const key = args[1];
-    const long n = PyObject_Length(mset);
+unique(PyObject *self, PyObject *const *args, const Py_ssize_t n_args) {
+    if (n_args < 1 || n_args > 2)
+        PYRAISE(TYPEERROR, "Function accepts exactly 1 or 2 arguments.");
+    PyObject *const elements = args[0], *key;
+    if (n_args == 1) key = Py_None;
+    else key = args[1];
+    const long n = PyObject_Length(elements);
     if (!Py_IsNone(key)) {
         if (PyCallable_Check(key) == 0)
             PYRAISE(TYPEERROR, "Invalid relational operator.");
     }
-    UniqueResult *uresult = n_uniq_pyobj_perms(mset, n, key);
+    UniqueResult uresult;
+    unique_local(elements, n, &uresult, key);
     if (PyErr_Occurred()) return NULL;
-    if (uresult->status == UNIQUE_FAILED)
-        PYRAISE(TYPEERROR, "relational / sequence init err");
-    PyObject *udict = uresult->udict;
-    free(uresult);
-    return udict;
+    if (uresult.status == UNIQUE_FAILED)
+        PYRAISE(uresult.exctype, uresult.errmsg);
+    return uresult.udict;
+}
+
+PyObject *
+unique_2(PyObject *self, PyObject *const *args, const Py_ssize_t n_args) {
+    if (n_args < 1 || n_args > 2)
+        PYRAISE(TYPEERROR, "Function accepts exactly 1 or 2 arguments.");
+    PyObject *const elements = args[0], *key;
+    if (!PySequence_Check(elements))
+        PYRAISE(TYPEERROR, "argument 1 must be a sequence");
+    const long n = PyObject_Length(elements);
+    if (n_args == 1)
+        key = Py_None;
+    else {
+        key = args[1];
+        if (key == NULL || PyCallable_Check(key) == 0)
+            PYRAISE(TYPEERROR, "Invalid relational operator.");
+    }
+    UniqueResult uresult;
+    uresult.exctype = PyExc_SystemError, uresult.errmsg = "unclassified err.";
+    uresult.status = UNIQUE_OK;
+    unique_local_2(elements, n, &uresult, key);
+    if (PyErr_Occurred()) return NULL;
+    if (uresult.status == UNIQUE_FAILED)
+        PYRAISE(uresult.exctype, uresult.errmsg);
+    return uresult.udict;
 }
