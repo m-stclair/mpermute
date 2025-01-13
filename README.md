@@ -8,6 +8,9 @@ implementation of "Loopless Generation of Multiset Permutations using a Constant
 Number of Variables by Prefix Shifts (Williams 2009). This implementation is
 3-4x faster and slightly more space-efficient than the pure Python version.
 
+It also exposes a backend function, `unique`, which is useful for counting
+unique elements of a collection (optionally grouped by a key function). 
+
 Experimental code. May crash your computer. Not suitable for any purpose.
 Use at your own peril.
 
@@ -23,7 +26,7 @@ Install from source with `pip install .`.
 ## examples of use
 
 ```
->>> from mpermute import mperms, mpermute
+>>> from mpermute import mperms, mpermute, unique
 
 >>> mpermute("akjj")
 
@@ -53,6 +56,12 @@ Install from source with `pip install .`.
  ([2, 3], [9, 1], [1], [1, 4], [1]),
 ...
 
+# when passed a second argument, all high-level functions in the `mpermute` 
+# library will treat it as a 'key' function that defines equivalence classes.
+# Outputs are guaranteed to include only one member of each equivalence class.
+# This will _usually_ be the last member of that equivalence class, but this 
+# behavior is not guaranteed.
+
 >>> mpermute(lists + (lists[0],), lambda x, y: len(x) > len(y))
 
 (([1], [1], [2, 3], [2, 3], [2, 3]),
@@ -66,7 +75,17 @@ Install from source with `pip install .`.
  ([2, 3], [2, 3], [2, 3], [1], [1]),
  ([1], [2, 3], [2, 3], [2, 3], [1]))
 
+# `unique()` offers performance improvements 
+# over pure-Python methods only when passed a key function. Calling it with 
+# no second argument should produce the same result as 
+# ```{k: seq.count(v) for v in set(seq)}``` (note that order of dict keys is 
+# undefined in both cases), with basically the same performance. 
+# Note that all elements of the collection passed to `unique` must be hashable.
 
+>>> rands = [random.randint(0, 10000) for _ in range(1000000)] 
+>>> unique(rands, lambda r: r % 3)
+
+{645: 333306, 5839: 332940, 4193: 333754}
 ```
 
 ## licensing

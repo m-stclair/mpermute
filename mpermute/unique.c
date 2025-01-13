@@ -122,10 +122,13 @@ unique_local(PyObject *elements, const long n, UniqueResult *const result,
         }
         long count = 0;
         PyObject *last = PySequence_Fast_GET_ITEM(fastel, 0);
-        PyObject *hash = PYCALL(key, last, NULL);
+        PyObject *vargs[1] = {last};
+        PyObject *dkw = PyDict_New();
+        PyObject *hash = PyObject_Vectorcall(key, vargs, 1, dkw);
         for (long ix = 1; ix < PySequence_Fast_GET_SIZE(fastel); ix++) {
             PyObject *const next = PySequence_Fast_GET_ITEM(fastel, ix);
-            PyObject *const nexthash = PYCALL(key, next, NULL);
+            vargs[0] = next;
+            PyObject *const nexthash = PyObject_Vectorcall(key, vargs, 1, dkw);
             if (!PYCOMP(nexthash, hash, Py_EQ)) {
                 PyDict_SetItem(udict, last, PyLong_FromLong(++count));
                 Py_INCREF(last);
@@ -133,6 +136,7 @@ unique_local(PyObject *elements, const long n, UniqueResult *const result,
             } else count++;
             last = next, hash = nexthash;
         }
+        Py_DECREF(dkw);
         PyDict_SetItem(udict, last, PyLong_FromLong(++count));
         Py_DECREF(list);
         Py_DECREF(fastel);
