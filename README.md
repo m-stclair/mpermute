@@ -74,18 +74,22 @@ Install from source with `pip install .`.
  ([2, 3], [2, 3], [1], [2, 3], [1]),
  ([2, 3], [2, 3], [2, 3], [1], [1]),
  ([1], [2, 3], [2, 3], [2, 3], [1]))
+ 
 
-# unique() offers performance improvements over pure-Python code only when 
-# passed a key function. Calling it with no second argument should produce the 
-# same result as {k: seq.count(v) for v in set(seq)}, with basically the same 
-# performance (note that order of dict keys is undefined in both cases).
-# All elements of the collection passed to `unique` must be hashable.
+# Calling unique(seq, keyfunc=None) should produce the same result as 
+# `{k: seq.count(v) for v in set(seq)}`, but with roughly 10x performance (note 
+# that order of dict keys is undefined in both cases).  It will generally also 
+# produce significant speedups over pure-Python techniques when passed a key 
+# function, although the ratio depends on how expensive the key function is.
 
 >>> rands = [random.randint(0, 10000) for _ in range(1000000)] 
 >>> unique(rands, lambda r: r % 3)
 
 {645: 333306, 5839: 332940, 4193: 333754}
 ```
+
+## Tips
+
 
 ## licensing
 
