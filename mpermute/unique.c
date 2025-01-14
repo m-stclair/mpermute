@@ -67,83 +67,65 @@ do {                                                                   \
     return;                                                            \
 } while(0)
 
+static inline bool
+rich_eq(const richcmpfunc f, PyObject *const a, PyObject *const b) {
+    PyObject *const res = (*f)(a, b, Py_EQ);
+    if (res == Py_True) return true;
+    Py_DECREF(res);  // can be an exception or something
+    return false;
+}
+
+static inline PyObject *
+identity_proxy(PyObject *const keyfunc_unused, PyObject *const *args,
+               const size_t n_unused, PyObject *const kwargs_unused) {
+    return args[0];
+}
+
 static void
 unique_local(PyObject *elements, const long n, UniqueResult *const result,
              PyObject *const key) {
     result->udict_sorted = false;
     PyObject *const udict = PyDict_New();
-    bool do_decref_elements = false;
-    if (Py_IsNone(key) > 0) {
-        if (!(PyList_Check(elements) || PyTuple_Check(elements))) {
-            elements = PySequence_Tuple(elements);
-            if (elements == NULL || PyErr_Occurred())
-                UL_SEQERR(result, elements, udict, false);
-            do_decref_elements = true;
-        }
-        PyObject *const fastel = PySequence_Fast(elements, "");
-        PyObject *const oset = PySet_New(elements);
-        if (PyErr_Occurred() || fastel == NULL || oset == NULL)
-            UL_SEQERR(result, elements, udict, do_decref_elements);
-        PyObject *const oset_iter = PyObject_GetIter(oset);
-        PyObject *item;
-        while((item = PyIter_Next(oset_iter)) != NULL) {
-            long count = 0;
-            for (long ix = 0; ix < n; ix++) {
-                PyObject *el = PySequence_Fast_GET_ITEM(fastel, ix);
-                if (PYCOMP(el, item, Py_EQ)) count += 1;
-            }
-            PyDict_SetItem(udict, item, PyLong_FromLong(count));
-            // both PySet_New and PyIter_Next create a strong reference. We
-            // are allowing one to survive to represent the reference held by
-            // udict.
-            Py_DECREF(item);
-        }
-        Py_DECREF(oset);
-        Py_DECREF(oset_iter);
-        Py_DECREF(fastel);
-        if (PyErr_Occurred()) {
-            UL_SEQERR(result, elements, udict, do_decref_elements);
-        }
-    } else {
-        PyObject *const sorted = GETATTR(IMPORT("builtins"), "sorted");
-        PyObject *args = PyTuple_New(1);
-        PyObject *kwargs = PyDict_New();
-        PyTuple_SetItem(args, 0, elements);
-        Py_INCREF(elements);
-        PyDict_SetItemString(kwargs, "key", key);
-        PyObject *const list = PyObject_Call(sorted, args, kwargs);
-        Py_DECREF(args);
-        Py_DECREF(kwargs);
-        if (!list) UL_SEQERR(result, elements, udict, false);
-        PyObject *const fastel = PySequence_Fast(list, "");
-        if (!fastel) {
-            Py_DECREF(list);
-            UL_SEQERR(result, elements, udict, false);
-        }
-        long count = 0;
-        PyObject *last = PySequence_Fast_GET_ITEM(fastel, 0);
-        PyObject *vargs[1] = {last};
-        PyObject *hash = PyObject_Vectorcall(key, vargs, 1, NULL);
-        for (long ix = 1; ix < PySequence_Fast_GET_SIZE(fastel); ix++) {
-            PyObject *const next = PySequence_Fast_GET_ITEM(fastel, ix);
-            vargs[0] = next;
-            PyObject *const nexthash = PyObject_Vectorcall(key, vargs, 1,
-                                                           NULL);
-            if (!PYCOMP(nexthash, hash, Py_EQ)) {
-                PyDict_SetItem(udict, last, PyLong_FromLong(++count));
-                Py_INCREF(last);
-                count = 0;
-            } else count++;
-            last = next, hash = nexthash;
-        }
-        Py_DECREF(dkw);
-        PyDict_SetItem(udict, last, PyLong_FromLong(++count));
-        Py_DECREF(list);
-        Py_DECREF(fastel);
-        result->udict_sorted = true;
+    if (n == 0) { result->udict = udict; return; } // nothing to do
+    PyObject *const sorted = GETATTR(IMPORT("builtins"), "sorted");
+    PyObject *args = PyTuple_New(1);
+    PyObject *kwargs = PyDict_New();
+    PyTuple_SetItem(args, 0, elements);
+    Py_INCREF(elements);
+    PyDict_SetItemString(kwargs, "key", key);
+    PyObject *const list = PyObject_Call(sorted, args, kwargs);
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    if (!list) UL_SEQERR(result, elements, udict, false);
+    long count = 0;
+    PyObject *(*kf)(PyObject *, PyObject * const*, size_t, PyObject *);
+    if (Py_IsNone(key)) kf = identity_proxy;
+    else kf = PyObject_Vectorcall;
+    PyObject *last = PySequence_Fast_GET_ITEM(list, 0);
+    PyObject *vargs[1] = {last};
+    PyObject *hash = kf(key, vargs, 1, NULL);
+    const richcmpfunc rcf = Py_TYPE(hash)->tp_richcompare;
+    if (rcf == NULL) {
+        Py_DECREF(hash);
+        PyErr_SetString(TYPEERROR, "Bad equality operator");
+        result->status = UNIQUE_FAILED;
+        return;
     }
-    if (do_decref_elements) Py_DECREF(elements);
-    // TODO: length-0 case
+    for (long ix = 1; ix < PySequence_Fast_GET_SIZE(list); ix++) {
+        PyObject *const next = PySequence_Fast_GET_ITEM(list, ix);
+        vargs[0] = next;
+        PyObject *const nexthash = kf(key, vargs, 1, NULL);
+        if (!rich_eq(rcf, nexthash, hash)) {
+//            if (!PYCOMP(nexthash, hash, Py_EQ)) {
+            PyDict_SetItem(udict, last, PyLong_FromLong(++count));
+            Py_INCREF(last);
+            count = 0;
+        } else count++;
+        last = next, hash = nexthash;
+    }
+    PyDict_SetItem(udict, last, PyLong_FromLong(++count));
+    Py_DECREF(list);
+    result->udict_sorted = true;
     result->udict = udict;
     result->nunique = PyObject_Length(udict);
 }
